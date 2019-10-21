@@ -1,0 +1,5 @@
+"0","t.test(hlm_data_sentiment$daily_sentiment ~ hlm_data_sentiment$dating)
+"
+"2","Error in t.test.formula(hlm_data_sentiment$daily_sentiment ~ hlm_data_sentiment$dating) : 
+  grouping factor must have exactly 2 levels
+"
