@@ -1,0 +1,373 @@
+---
+title: "SRA_Sumbission"
+output: html_document
+---
+---
+title: "Text_processing"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+rm(list=ls())
+packages <- c("rio","tidyverse","reshape","lme4","interactions","jtools","lmerTest","Amelia","mice","lavaan","semTools","janitor","stargazer","plotluck","splitstackshape","gratia","mgcv","Amelia","lubridate","here","fuzzyjoin","Metrics","readxl","tidytext")
+if (length(setdiff(packages, rownames(installed.packages()))) > 0) {
+  install.packages(setdiff(packages, rownames(installed.packages())))  
+}
+lapply(packages, library, character.only = TRUE)
+
+```
+
+```{r reading the data, echo=FALSE,message=FALSE,warning=FALSE}
+#raw_text_data <- import(here("data/text_df_unique.csv"))
+intensive_ema_data <- import(here("data/ema_df.csv"))
+#daily_ema_data <- import(here("data/daily_df.csv"))
+raw_text_data <- import(here("data/maps_text_unique_nopw.csv"))
+daily_ema_data <- read_excel(here("data/maps_daily_nopw.xlsx"))
+
+#as.POSIXlt(raw_text_data$timestamp_est, format="%m/%d/%Y %H:%M",tz="America/New_York")
+
+
+# Missing some participant IDs so I'm moving the bucket device ID over to the NA
+raw_text_data$participant_id[is.na(raw_text_data$participant_id)] <- raw_text_data$bucket_device_id[is.na(raw_text_data$participant_id)]
+
+stuff_to_remove <- c("Send a chat","Enter message","Say something in pizza_suplex's chat","Search or type web address","Search or enter URL","Type a message","Search YouTube","Say your thing","Write a message","Shantii.thedubb","Type search keywords")
+
+# Remove "send a chat" from thing
+
+raw_text_data <- raw_text_data[!grepl(stuff_to_remove, raw_text_data$text),]
+
+
+more_stuff_to_remove <- c("w\x95","\x95\x95\x95\x95\x95\x95\x95i\x95","Type a message\x85")
+
+for(i in 1:10){
+  raw_text_data <- raw_text_data %>% filter(!str_detect(text, more_stuff_to_remove))
+}
+
+
+testing_buckets <- unique(raw_text_data$bucket_device_id)
+
+device_id <- data.frame(matrix(ncol = 2, nrow = 0))
+colnames(device_id) <- c("bucket_device_id","participant_id")
+
+for(i in 1:length(testing_buckets)){
+  what <- unique(raw_text_data$participant_id[raw_text_data$bucket_device_id==testing_buckets[i]])
+  device_id[i,1] <- testing_buckets[i]
+  device_id[i,2] <- what
+}
+
+# Remove the test data from the dataset
+daily_ema_data<-daily_ema_data[!(daily_ema_data$participant_id=="test"),]
+
+intensive_ema_data <- merge(intensive_ema_data,device_id,by="bucket_device_id")
+
+```
+
+
+
+```{r, echo=FALSE,message=FALSE,warning=FALSE}
+# Let's keep only the social media texts
+
+
+classify <- c("com.atebits.Tweetie2" = "community","com.reddit.Reddit"= "community","com.facebook.Facebook"= "community","com.burbn.instagram"= "community","com.facebook.katana"= "community","com.tumblr"= "community","tv.twitch.android.app"= "community","com.instagram.android"= "community","com.twitter.android"= "community","com.grindrguy.grindrx"= "private","com.Popshow.YOLO"= "private","net.whatsapp.WhatsApp"= "private","com.moxco.bumble"= "private","com.groupme.iphone-app.sharing-ext"= "private","com.apple.MailCompositionService"= "private","com.cardify.tinder"= "private","com.apple.mobilesms.compose"= "private","com.facebook.Messenger"= "private","com.apple.MobileSMS.MessagesNotificationExtension"= "private","com.apple.mobilemail"= "private","com.toyopagroup.picaboo"= "private","com.apple.MobileSMS"= "private","com.samsung.android.messaging"= "private","com.discord"= "private","com.snapchat.android"= "private","com.whatsapp"= "private","com.lipsisoftware.lipsi"= "private")
+
+dating <- c("com.atebits.Tweetie2" = "no","com.reddit.Reddit"= "no","com.facebook.Facebook"= "no","com.burbn.instagram"= "no","com.facebook.katana"= "no","com.tumblr"= "no","tv.twitch.android.app"= "no","com.instagram.android"= "no","com.twitter.android"= "no","com.grindrguy.grindrx"= "yes","com.Popshow.YOLO"= "no","net.whatsapp.WhatsApp"= "no","com.moxco.bumble"= "yes","com.groupme.iphone-app.sharing-ext"= "no","com.apple.MailCompositionService"= "no","com.cardify.tinder"= "yes","com.apple.mobilesms.compose"= "no","com.facebook.Messenger"= "no","com.apple.MobileSMS.MessagesNotificationExtension"= "no","com.apple.mobilemail"= "no","com.toyopagroup.picaboo"= "no","com.apple.MobileSMS"= "no","com.samsung.android.messaging"= "no","com.discord"= "no","com.snapchat.android"= "no","com.whatsapp"= "no","com.lipsisoftware.lipsi"= "no")
+
+social_media <-c("com.atebits.Tweetie2","com.reddit.Reddit","com.facebook.Facebook","com.burbn.instagram","com.facebook.katana","com.tumblr","tv.twitch.android.app","com.instagram.android","com.twitter.android","com.grindrguy.grindrx","com.Popshow.YOLO","net.whatsapp.WhatsApp","com.moxco.bumble","com.groupme.iphone-app.sharing-ext","com.apple.MailCompositionService","com.cardify.tinder","com.apple.mobilesms.compose","com.facebook.Messenger","com.apple.MobileSMS.MessagesNotificationExtension","com.apple.mobilemail","com.toyopagroup.picaboo","com.apple.MobileSMS","com.samsung.android.messaging","com.discord","com.snapchat.android","com.whatsapp","com.lipsisoftware.lipsi")
+
+raw_text_data <- raw_text_data[ raw_text_data$app %in% social_media, ]
+
+raw_text_data$date <- as.Date(raw_text_data$date, format = "%m/%d/%Y")
+```
+
+# Text data
+
+Let's get a tally of the raw text chunks per participant
+
+```{r initial processing of the data, echo=FALSE,message=FALSE,warning=FALSE,warning=FALSE}
+# First we're going to just check out and see how many messages each participant sent
+
+text_counts <- raw_text_data %>%
+  group_by(participant_id,date) %>%
+  tally()
+
+
+```
+
+# Daily EMAs
+
+Let's see how many participants responded to the daily EMA data
+
+```{r, processing the daily EMA data, echo=FALSE,message=FALSE,warning=FALSE,warning=FALSE}
+# Now let's see what the first EMA time and date is for each participant
+
+daily_ema_data <- daily_ema_data[!is.na(daily_ema_data$participant_id) & !is.na(daily_ema_data$bucket_device_id),]
+
+
+daily_ema_data$participant_id[is.na(daily_ema_data$participant_id)] <- daily_ema_data$bucket_device_id[is.na(daily_ema_data$participant_id)]
+
+
+daily_testing_buckets <- unique(daily_ema_data$bucket_device_id)
+
+daily_device_id <- data.frame(matrix(ncol = 2, nrow = 0))
+colnames(daily_device_id) <- c("bucket_device_id","participant_id")
+
+for(i in 1:length(daily_testing_buckets)){
+  what <- unique(daily_ema_data$participant_id[daily_ema_data$bucket_device_id==daily_testing_buckets[i]])
+  daily_device_id[i,1] <- daily_testing_buckets[i]
+  daily_device_id[i,2] <- what
+}
+
+daily_ema_data$timestamp_est <- as.POSIXct(daily_ema_data$timestamp_est, format="%Y-%m-%d %H:%M:%S",tz="America/New_York")
+
+daily_ema_data$date <- as_date(daily_ema_data$timestamp_est)
+
+
+daily_ema_data %>%
+  ggplot(aes(x = timestamp_est, y = daily, group = participant_id)) +
+  stat_summary(aes(group = participant_id,color=participant_id), geom = "line", fun.y = mean, size = .5) +
+  facet_wrap(~participant_id) + 
+  theme(legend.position = "none")
+
+
+
+```
+
+
+```{r hGAM data processing, echo=FALSE,message=FALSE,warning=FALSE}
+text_counts$date <- as.Date(text_counts$date, format = "%Y-%m-%d")
+
+```
+
+
+
+
+
+```{r tidy text, echo=FALSE}
+
+library(tidytext)
+library(dplyr)
+text_tidy_data <- raw_text_data
+
+text_tidy_data <- text_tidy_data %>%
+  dplyr::group_by(participant_id) %>%
+  dplyr::mutate(textnumber = row_number()) %>%
+  dplyr::ungroup() %>%
+  unnest_tokens(word, text)
+
+
+
+
+
+texting_sentiment <- text_tidy_data %>%
+  inner_join(get_sentiments("bing")) %>%
+  count(participant_id, timestamp_est, sentiment) %>%
+  spread(sentiment, n, fill = 0) %>%
+  mutate(sentiment = positive - negative)
+
+
+text_tidy_data_filtered <- text_tidy_data %>%
+  left_join(texting_sentiment,by = c("participant_id","timestamp_est"))
+
+text_tidy_data_filtered$sentiment[is.na(text_tidy_data_filtered$sentiment)] <- 0
+
+
+
+```
+
+```{r}
+
+daily_text_sentiment <- text_tidy_data_filtered %>%
+  group_by(participant_id,date,app) %>%
+  count(daily_sentiment=mean(sentiment))
+
+daily_text_sentiment$social<- classify[daily_text_sentiment$app]
+
+daily_text_sentiment$dating<- dating[daily_text_sentiment$app]
+
+daily_text_sentiment$social <- as.factor(daily_text_sentiment$social)
+
+daily_text_sentiment$date <- as.Date(daily_text_sentiment$date, format = "%Y-%m-%d")
+
+
+library(dplyr)
+daily_text_sentiment <- daily_text_sentiment %>% 
+   group_by(participant_id, date, social) %>% 
+   mutate(daily_sentiment = weighted.mean(daily_sentiment, n)) %>%
+   distinct(participant_id,date,socil,.keep_all = TRUE)
+
+hlm_data_sentiment <- merge(daily_text_sentiment, daily_ema_data, by=c("participant_id","date")) %>%
+  select(participant_id,date,daily_sentiment,n,site,daily,day_of_week,weekend,social,dating)
+
+
+
+hlm_data_sentiment$log_n <- log(hlm_data_sentiment$n)
+```
+
+```{r}
+
+#hlm_data_sentiment <- hlm_data_sentiment %>%
+#  filter(n < 400)
+
+
+
+model_3_0 <- lmer(daily ~ 1 + (1|participant_id),hlm_data_sentiment)
+sjstats::icc(model_3_0)
+summary(model_3_0)
+
+
+model_3_1 <- lmer(daily ~ n*daily_sentiment*social + (1|participant_id), hlm_data_sentiment)
+
+summary(model_3_1)
+
+anova(model_3_0,model_3_1)
+
+
+plot_1 <- interact_plot(model_3_1,n,social,plot.point=FALSE,interval=TRUE,legend.main="Social App Type")+ ylim(0,100) + xlab("Number of Texts Sent") + ylab("Reported Daily Mood")
+
+ggsave("interaction_plot.png",plot=plot_1,dpi=600,device="png",width=8,height=5)
+
+```
+
+
+
+```{r}
+hlm_data_sentiment %>%
+  group_by(dating) %>%
+  summarise(mean(daily_sentiment),sd(daily_sentiment))
+
+hlm_data_sentiment %>%
+  group_by(dating) %>%
+  count()
+
+
+```
+
+
+```{r}
+library(nlme)
+um.fit <- lme(fixed= daily ~ 1, 
+              random= ~ 1|participant_id, 
+              data=hlm_data_sentiment,
+              na.action=na.exclude)
+summary(um.fit)
+
+VarCorr(um.fit)
+
+RandomEffects <- as.numeric(VarCorr(um.fit)[,1])
+ICC_between <- RandomEffects[1]/(RandomEffects[1]+RandomEffects[2]) 
+ICC_between
+```
+
+```{r}
+daily.imeans <- plyr::ddply(hlm_data_sentiment, "participant_id", summarize, imean.n=mean(n, na.rm=TRUE),imean.daily_sentiment=mean(daily_sentiment, na.rm=TRUE),imean.daily=mean(daily, na.rm=TRUE))
+
+daily.imeans$imean.n.c <- scale(daily.imeans$imean.n,center=TRUE,scale=FALSE)
+daily.imeans$imean.daily_sentiment.c <- scale(daily.imeans$imean.daily_sentiment,center=TRUE,scale=FALSE)
+daily.imeans$imean.daily.c <- scale(daily.imeans$imean.daily,center=TRUE,scale=FALSE)
+
+
+hlm_data_sentiment <- merge(hlm_data_sentiment,daily.imeans,by="participant_id")
+
+hlm_data_sentiment$n.state <- hlm_data_sentiment$n - hlm_data_sentiment$imean.n
+
+hlm_data_sentiment$daily_sentiment.state <- hlm_data_sentiment$daily_sentiment - hlm_data_sentiment$imean.daily_sentiment
+
+hlm_data_sentiment$daily.state <- hlm_data_sentiment$daily - hlm_data_sentiment$imean.daily
+
+```
+
+
+```{r}
+
+hlm_data_sentiment <- hlm_data_sentiment %>%
+  group_by(participant_id) %>%
+  mutate(diff_days = difftime(date, min(date),units="days"))
+
+
+ctrl <- lmeControl(opt='optim')
+
+
+lg.fit.q4 <- lme(fixed= daily ~ imean.n.c*imean.daily_sentiment.c,
+                 random= ~ 1 + diff_days |participant_id, 
+                 correlation = corAR1(),
+                 data=hlm_data_sentiment,
+                 control = ctrl,
+                 na.action=na.exclude)
+
+summary(lg.fit.q4)
+
+
+test_0 <- lmer(daily ~ 1 + (1|participant_id/diff_days), hlm_data_sentiment)
+
+test <- lmer(daily ~ imean.daily_sentiment.c*imean.n.c + (1|participant_id/diff_days), hlm_data_sentiment)
+
+summary(test)
+
+anova(test_0,test)
+
+interact_plot(test,imean.n.c,imean.daily_sentiment.c,plot.points=TRUE)
+
+```
+
+Now let's see what if we only look at percentage of first person pronouns as a predictor
+
+```{r}
+fpp <- c("i","me","my","mine","we","us","our","ours","im","myself","ourselves")
+
+text_tidy_data_filtered$fpp <- text_tidy_data_filtered$word %in% fpp
+
+text_tidy_data_filtered$fpp <- as.factor(text_tidy_data_filtered$fpp)
+
+daily_text_pronouns <- text_tidy_data_filtered %>% 
+  count(participant_id, date, fpp) %>%
+  group_by(participant_id,date) %>%
+  mutate(fpp_proportion = n / sum(n)) %>%
+  filter(fpp == "TRUE") %>%
+  select(-n,-fpp)
+
+daily_text_pronouns <- hlm_data_sentiment %>%
+  left_join(daily_text_pronouns,by = c("participant_id","date")) 
+
+daily_text_pronouns <- daily_text_pronouns %>%
+  filter(fpp_proportion < 0.4)
+
+base_model <- lmer(daily ~ 1 + (1|participant_id),daily_text_pronouns)
+
+model_3_1 <- lmer(daily ~ fpp_proportion*daily_sentiment + (1|participant_id), daily_text_pronouns)
+
+summary(model_3_1)
+
+interact_plot(model_3_1, fpp_proportion,daily_sentiment)
+
+anova(base_model,model_3_1)
+```
+
+
+
+```{r}
+daily.imeans <- plyr::ddply(daily_text_pronouns, "participant_id", summarize,imean.fpp=mean(fpp_proportion, na.rm=TRUE))
+
+daily.imeans$imean.fpp.c <- scale(daily.imeans$imean.fpp,center=TRUE,scale=FALSE)
+
+daily_text_pronouns <- merge(daily_text_pronouns,daily.imeans,by="participant_id")
+
+daily_text_pronouns$fpp.state <- daily_text_pronouns$fpp - daily_text_pronouns$imean.fpp
+
+```
+
+```{r}
+lg.fit.q4 <- lme(fixed= daily.state ~ fpp.state,
+                 random= ~ 1  |participant_id, 
+                 correlation = corAR1(),
+                 data=daily_text_pronouns,
+                 control = ctrl,
+                 na.action=na.exclude)
+
+
+model_3_1 <- lmer(daily ~ fpp.state*n.state*fpp.state + (1|participant_id), daily_text_pronouns)
+
+summary(model_3_1)
+
+plot(daily_text_pronouns$daily,daily_text_pronouns$imean.fpp)
+```
+
