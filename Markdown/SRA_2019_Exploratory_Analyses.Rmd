@@ -312,8 +312,8 @@ interact_plot(test,imean.n.c,imean.daily_sentiment.c,plot.points=TRUE)
 Now let's see what if we only look at percentage of first person pronouns as a predictor
 
 ```{r}
-fpp <- c("i","me","my","mine","we","us","our","ours","im","myself","ourselves")
-
+fpp <- c("i","me","my","mine","im","myself","ikr","idgaf","ik")
+#,"ourselves","we","us","our","ours"
 text_tidy_data_filtered$fpp <- text_tidy_data_filtered$word %in% fpp
 
 text_tidy_data_filtered$fpp <- as.factor(text_tidy_data_filtered$fpp)
@@ -323,13 +323,16 @@ daily_text_pronouns <- text_tidy_data_filtered %>%
   group_by(participant_id,date) %>%
   mutate(fpp_proportion = n / sum(n)) %>%
   filter(fpp == "TRUE") %>%
+  mutate(fpp_n = n) %>%
   select(-n,-fpp)
+
+
 
 daily_text_pronouns <- hlm_data_sentiment %>%
   left_join(daily_text_pronouns,by = c("participant_id","date")) 
 
-daily_text_pronouns <- daily_text_pronouns %>%
-  filter(fpp_proportion < 0.4)
+#daily_text_pronouns <- daily_text_pronouns %>%
+ # filter(fpp_n < 200)
 
 base_model <- lmer(daily ~ 1 + (1|participant_id),daily_text_pronouns)
 
@@ -345,29 +348,31 @@ anova(base_model,model_3_1)
 
 
 ```{r}
-daily.imeans <- plyr::ddply(daily_text_pronouns, "participant_id", summarize,imean.fpp=mean(fpp_proportion, na.rm=TRUE))
+daily.imeans <- plyr::ddply(daily_text_pronouns, "participant_id", summarize,imean.fpp_n=mean(fpp_n, na.rm=TRUE))
 
-daily.imeans$imean.fpp.c <- scale(daily.imeans$imean.fpp,center=TRUE,scale=FALSE)
+daily.imeans$imean.fpp_n.c <- scale(daily.imeans$imean.fpp_n,center=TRUE,scale=FALSE)
 
 daily_text_pronouns <- merge(daily_text_pronouns,daily.imeans,by="participant_id")
 
-daily_text_pronouns$fpp.state <- daily_text_pronouns$fpp - daily_text_pronouns$imean.fpp
+daily_text_pronouns$fpp_n.state <- daily_text_pronouns$fpp_n - daily_text_pronouns$imean.fpp_n
 
 ```
 
 ```{r}
-lg.fit.q4 <- lme(fixed= daily.state ~ fpp.state,
-                 random= ~ 1  |participant_id, 
+lg.fit.q4 <- lme(fixed= daily.state ~ fpp_n.state*imean.fpp_n.c,
+                 random= ~ 1 +diff_days |participant_id, 
                  correlation = corAR1(),
                  data=daily_text_pronouns,
                  control = ctrl,
                  na.action=na.exclude)
 
 
-model_3_1 <- lmer(daily ~ fpp.state*n.state*fpp.state + (1|participant_id), daily_text_pronouns)
+model_3_1 <- lmer(daily ~ fpp_n.state*imean.fpp_n.c + (diff_days|participant_id), daily_text_pronouns)
 
-summary(model_3_1)
+summary(lg.fit.q4)
 
-plot(daily_text_pronouns$daily,daily_text_pronouns$imean.fpp)
+plot(daily_text_pronouns$daily,daily_text_pronouns$fpp_n)
+
+interact_plot(model_3_1,imean.fpp_n.c,fpp_n.state,plot.points = TRUE)
 ```
 
