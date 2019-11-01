@@ -9,7 +9,7 @@ output: html_document
 
 ```{r setup, include=FALSE}
 rm(list=ls())
-packages <- c("rio","tidyverse","reshape","lme4","interactions","jtools","lmerTest","Amelia","mice","lavaan","semTools","janitor","stargazer","plotluck","splitstackshape","gratia","mgcv","Amelia","lubridate","here","fuzzyjoin","Metrics","readxl","tidytext")
+packages <- c("rio","tidyverse","reshape","lme4","interactions","jtools","lmerTest","Amelia","mice","lavaan","semTools","janitor","stargazer","plotluck","splitstackshape","gratia","mgcv","Amelia","lubridate","here","fuzzyjoin","Metrics","readxl","tidytext","sjPlot","sjmisc")
 if (length(setdiff(packages, rownames(installed.packages()))) > 0) {
   install.packages(setdiff(packages, rownames(installed.packages())))  
 }
@@ -342,7 +342,6 @@ summary(model_3_1)
 
 interact_plot(model_3_1, fpp_proportion,daily_sentiment)
 
-anova(base_model,model_3_1)
 ```
 
 
@@ -366,13 +365,53 @@ lg.fit.q4 <- lme(fixed= daily.state ~ fpp_n.state*imean.fpp_n.c,
                  control = ctrl,
                  na.action=na.exclude)
 
+model_3_0 <- lmer(daily.state ~ 1 + (1|participant_id), daily_text_pronouns,REML=FALSE)
 
-model_3_1 <- lmer(daily ~ fpp_n.state*imean.fpp_n.c + (diff_days|participant_id), daily_text_pronouns)
+model_3_1 <- lmer(daily ~ fpp_n.state*imean.fpp_n.c + (diff_days|participant_id), daily_text_pronouns,REML=FALSE)
 
-summary(lg.fit.q4)
+summary(model_3_0)
+
+summary(model_3_1)
 
 plot(daily_text_pronouns$daily,daily_text_pronouns$fpp_n)
 
-interact_plot(model_3_1,imean.fpp_n.c,fpp_n.state,plot.points = TRUE)
+interact_plot(model_3_1,imean.fpp_n.c,fpp_n.state,interval=TRUE)
+
+
+```
+
+```{r}
+packages <- c("rio","tidyverse","reshape","lme4","interactions","jtools","janitor","merTools","plotly")
+if (length(setdiff(packages, rownames(installed.packages()))) > 0) {
+  install.packages(setdiff(packages, rownames(installed.packages())))  
+}
+lapply(packages, library, character.only = TRUE)
+
+# Simple function for plotting the fixed effects coefficients form an lmer() output
+FEplot <- function(out) {
+  feEx <- FEsim(out, 1000)
+  library(ggplot2)
+  ggplot(feEx[feEx$term!= "(Intercept)", ]) + 
+    aes(x = term, ymin = median - 1.96 * sd, 
+        ymax = median + 1.96 * sd, y = median) + 
+    geom_pointrange() + 
+    geom_hline(yintercept = 0, size = I(1.1), color = I("red")) + 
+    coord_flip() + 
+    theme_bw() + labs(title = "Coefficient Plot of Model", 
+                      x = "Median Effect Estimate", y = paste(out@call$formula[[2]]))
+}
+# Simple function for plotting the random effects coefficients form an lmer() output
+REplot <- function(out) {
+  plotREsim(REsim(out),facet=FALSE)  +
+  ggtitle('Plot of Random Effects', subtitle = 'Interval Estimates') 
+}
+
+FEplot(model_3_1)
+
+REplot(model_3_1)
+
+
+teplot_model(model_3_1, type = "re", facet.grid=FALSE)
+
 ```
 

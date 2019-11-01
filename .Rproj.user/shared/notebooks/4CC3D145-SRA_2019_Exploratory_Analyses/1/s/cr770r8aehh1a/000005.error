@@ -1,1 +1,0 @@
-{"frames":[{"character_number":0,"end_character_number":0,"end_line_number":0,"file":"","func":"plyr::ddply(imean.fpp = mean(fpp_proportion, na.rm = TRUE))","line_number":0},{"character_number":0,"end_character_number":0,"end_line_number":0,"file":"","func":"empty(.data)","line_number":0}],"message":"Error in empty(.data) : argument \".data\" is missing, with no default\n"}
