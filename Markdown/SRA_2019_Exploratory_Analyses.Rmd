@@ -9,7 +9,7 @@ output: html_document
 
 ```{r setup, include=FALSE}
 rm(list=ls())
-packages <- c("rio","tidyverse","reshape","lme4","interactions","jtools","lmerTest","Amelia","mice","lavaan","semTools","janitor","stargazer","plotluck","splitstackshape","gratia","mgcv","Amelia","lubridate","here","fuzzyjoin","Metrics","readxl","tidytext","sjPlot","sjmisc")
+packages <- c("rio","tidyverse","reshape","lme4","interactions","jtools","lmerTest","Amelia","mice","lavaan","semTools","janitor","stargazer","plotluck","splitstackshape","gratia","mgcv","Amelia","lubridate","here","fuzzyjoin","Metrics","readxl","tidytext","sjPlot","sjmisc","data.table")
 if (length(setdiff(packages, rownames(installed.packages()))) > 0) {
   install.packages(setdiff(packages, rownames(installed.packages())))  
 }
@@ -20,7 +20,7 @@ lapply(packages, library, character.only = TRUE)
 
 ```
 
-```{r reading the data, echo=FALSE,message=FALSE,warning=FALSE}
+```{r reading the data, include = FALSE,message=FALSE,warning=FALSE}
 #raw_text_data <- import(here("data/text_df_unique.csv"))
 intensive_ema_data <- import(here("data/ema_df.csv"))
 #daily_ema_data <- import(here("data/daily_df.csv"))
@@ -72,7 +72,7 @@ raw_text_data <- raw_text_data %>%
 
 
 
-```{r, echo=FALSE,message=FALSE,warning=FALSE}
+```{r, include = FALSE,message=FALSE,warning=FALSE}
 # Let's keep only the social media texts
 
 
@@ -87,11 +87,8 @@ raw_text_data <- raw_text_data[ raw_text_data$app %in% social_media, ]
 raw_text_data$date <- as.Date(raw_text_data$date, format = "%m/%d/%Y")
 ```
 
-# Text data
 
-Let's get a tally of the raw text chunks per participant
-
-```{r initial processing of the data, echo=FALSE,message=FALSE,warning=FALSE,warning=FALSE}
+```{r initial processing of the data, include = FALSE,message=FALSE,warning=FALSE,warning=FALSE}
 # First we're going to just check out and see how many messages each participant sent
 
 text_counts <- raw_text_data %>%
@@ -101,11 +98,8 @@ text_counts <- raw_text_data %>%
 
 ```
 
-# Daily EMAs
 
-Let's see how many participants responded to the daily EMA data
-
-```{r, processing the daily EMA data, echo=FALSE,message=FALSE,warning=FALSE,warning=FALSE}
+```{r, processing the daily EMA data, include = FALSE,message=FALSE,warning=FALSE,warning=FALSE}
 # Now let's see what the first EMA time and date is for each participant
 
 daily_ema_data <- daily_ema_data[!is.na(daily_ema_data$participant_id) & !is.na(daily_ema_data$bucket_device_id),]
@@ -140,7 +134,7 @@ daily_ema_data %>%
 ```
 
 
-```{r hGAM data processing, echo=FALSE,message=FALSE,warning=FALSE}
+```{r hGAM data processing, include = FALSE,message=FALSE,warning=FALSE}
 text_counts$date <- as.Date(text_counts$date, format = "%Y-%m-%d")
 
 ```
@@ -149,7 +143,7 @@ text_counts$date <- as.Date(text_counts$date, format = "%Y-%m-%d")
 
 
 
-```{r tidy text, echo=FALSE}
+```{r tidy text, include = FALSE}
 
 library(tidytext)
 library(dplyr)
@@ -181,7 +175,7 @@ text_tidy_data_filtered$sentiment[is.na(text_tidy_data_filtered$sentiment)] <- 0
 
 ```
 
-```{r}
+```{r, include = FALSE}
 
 daily_text_sentiment <- text_tidy_data_filtered %>%
   group_by(participant_id,date,app) %>%
@@ -198,7 +192,7 @@ daily_text_sentiment$date <- as.Date(daily_text_sentiment$date, format = "%Y-%m-
 
 library(dplyr)
 daily_text_sentiment <- daily_text_sentiment %>% 
-   group_by(participant_id, date, social) %>% 
+   group_by(participant_id, date) %>% 
    mutate(daily_sentiment = weighted.mean(daily_sentiment, n)) %>%
    distinct(participant_id,date,socil,.keep_all = TRUE)
 
@@ -210,7 +204,7 @@ hlm_data_sentiment <- merge(daily_text_sentiment, daily_ema_data, by=c("particip
 hlm_data_sentiment$log_n <- log(hlm_data_sentiment$n)
 ```
 
-```{r}
+```{r, include = FALSE}
 
 #hlm_data_sentiment <- hlm_data_sentiment %>%
 #  filter(n < 400)
@@ -222,22 +216,22 @@ sjstats::icc(model_3_0)
 summary(model_3_0)
 
 
-model_3_1 <- lmer(daily ~ n*daily_sentiment*social + (1|participant_id), hlm_data_sentiment)
-
-summary(model_3_1)
-
-anova(model_3_0,model_3_1)
-
-
-plot_1 <- interact_plot(model_3_1,n,social,plot.point=FALSE,interval=TRUE,legend.main="Social App Type")+ ylim(0,100) + xlab("Number of Texts Sent") + ylab("Reported Daily Mood")
-
-ggsave("interaction_plot.png",plot=plot_1,dpi=600,device="png",width=8,height=5)
+# model_3_1 <- lmer(daily ~ n*daily_sentiment*social + (1|participant_id), hlm_data_sentiment)
+# 
+# summary(model_3_1)
+# 
+# anova(model_3_0,model_3_1)
+# 
+# 
+# plot_1 <- interact_plot(model_3_1,n,social,plot.point=FALSE,interval=TRUE,legend.main="Social App Type")+ ylim(0,100) + xlab("Number of Texts Sent") + ylab("Reported Daily Mood")
+# 
+# ggsave("interaction_plot.png",plot=plot_1,dpi=600,device="png",width=8,height=5)
 
 ```
 
 
 
-```{r}
+```{r, include = FALSE}
 hlm_data_sentiment %>%
   group_by(dating) %>%
   summarise(mean(daily_sentiment),sd(daily_sentiment))
@@ -250,7 +244,7 @@ hlm_data_sentiment %>%
 ```
 
 
-```{r}
+```{r, include = FALSE}
 library(nlme)
 um.fit <- lme(fixed= daily ~ 1, 
               random= ~ 1|participant_id, 
@@ -265,7 +259,7 @@ ICC_between <- RandomEffects[1]/(RandomEffects[1]+RandomEffects[2])
 ICC_between
 ```
 
-```{r}
+```{r, include = FALSE}
 daily.imeans <- plyr::ddply(hlm_data_sentiment, "participant_id", summarize, imean.n=mean(n, na.rm=TRUE),imean.daily_sentiment=mean(daily_sentiment, na.rm=TRUE),imean.daily=mean(daily, na.rm=TRUE))
 
 daily.imeans$imean.n.c <- scale(daily.imeans$imean.n,center=TRUE,scale=FALSE)
@@ -284,7 +278,7 @@ hlm_data_sentiment$daily.state <- hlm_data_sentiment$daily - hlm_data_sentiment$
 ```
 
 
-```{r}
+```{r, include = FALSE}
 
 hlm_data_sentiment <- hlm_data_sentiment %>%
   group_by(participant_id) %>%
@@ -316,9 +310,8 @@ interact_plot(test,imean.n.c,imean.daily_sentiment.c,plot.points=TRUE)
 
 ```
 
-Now let's see what if we only look at percentage of first person pronouns as a predictor
 
-```{r}
+```{r, include = FALSE}
 fpp <- c("i","me","my","mine","im","myself","ikr","idgaf","ik")
 #,"ourselves","we","us","our","ours"
 text_tidy_data_filtered$fpp <- text_tidy_data_filtered$word %in% fpp
@@ -333,18 +326,18 @@ text_tidy_data_filtered$word[text_tidy_data_filtered$word==""] <- NA
 text_tidy_data_filtered <- text_tidy_data_filtered %>%
   drop_na(word)
 
+text_tidy_data_filtered$social<- classify[text_tidy_data_filtered$app]
+
+text_tidy_data_filtered$social <- as.factor(text_tidy_data_filtered$social)
+
+
 hlm_data_sentiment$start_time_ema <- hlm_data_sentiment$timestamp_ema - hours(24)
 
-hlm_data_sentiment_test <- hlm_data_sentiment %>%
-  filter(participant_id=="2018")
-
-text_tidy_data_filtered_test <- text_tidy_data_filtered %>%
-  filter(participant_id=="2018")
-library(data.table)
+hlm_data_sentiment <- hlm_data_sentiment %>%
+  dplyr::select(-social)
 
 setDT(text_tidy_data_filtered)
 setDT(hlm_data_sentiment)
-
 
 setDT(text_tidy_data_filtered)[, `:=`(
     time1 = timestamp_est,
@@ -357,12 +350,15 @@ test <- foverlaps(hlm_data_sentiment,text_tidy_data_filtered, by.x = c("particip
 
 
 what <- test %>%
-  group_by(participant_id, timestamp_ema,.drop=FALSE) %>%
+  group_by(participant_id, timestamp_ema,social,.drop=FALSE) %>%
   count(fpp) %>%
-  mutate(fpp_proportion = n / sum(n)) %>%
   filter(fpp == "TRUE") %>%
   mutate(fpp_n = n) %>%
   select(-n,-fpp)
+
+what <- what %>%
+  group_by(participant_id,timestamp_ema,.drop=FALSE) %>%
+  add_tally(fpp_n)
 
 daily_text_pronouns <- hlm_data_sentiment %>%
   left_join(what,by = c("participant_id","timestamp_ema"))
@@ -381,13 +377,13 @@ daily_text_pronouns <- hlm_data_sentiment %>%
 #daily_text_pronouns <- daily_text_pronouns %>%
  # filter(fpp_n < 200)
 
-base_model <- lmer(daily ~ 1 + (1|participant_id),daily_text_pronouns)
-
-model_3_1 <- lmer(daily ~ fpp_proportion*daily_sentiment + (1|participant_id), daily_text_pronouns)
-
-summary(model_3_1)
-
-interact_plot(model_3_1, fpp_proportion,daily_sentiment)
+# base_model <- lmer(daily ~ 1 + (1|participant_id),daily_text_pronouns)
+# 
+# model_3_1 <- lmer(daily ~ fpp_proportion*daily_sentiment + (1|participant_id), daily_text_pronouns)
+# 
+# summary(model_3_1)
+# 
+# interact_plot(model_3_1, fpp_proportion,daily_sentiment)
 
 
 
@@ -395,8 +391,8 @@ interact_plot(model_3_1, fpp_proportion,daily_sentiment)
 
 
 
-```{r}
-daily.imeans <- plyr::ddply(daily_text_pronouns, "participant_id", summarize,imean.fpp_n=mean(fpp_n, na.rm=TRUE))
+```{r, include = FALSE}
+daily.imeans <- plyr::ddply(daily_text_pronouns, .(participant_id,social), summarize,imean.fpp_n=mean(fpp_n, na.rm=TRUE))
 
 daily.imeans$imean.fpp_n.c <- scale(daily.imeans$imean.fpp_n,center=TRUE,scale=FALSE)
 
@@ -406,10 +402,13 @@ daily_text_pronouns$fpp_n.state <- daily_text_pronouns$fpp_n - daily_text_pronou
 
 ```
 
-```{r}
+```{r, include = FALSE}
+daily_text_pronouns$fpp_zscore <- ave(daily_text_pronouns$fpp_n.state, daily_text_pronouns$participant_id,daily_text_pronouns$social, FUN=scale)
 
-daily_text_pronouns <- daily_text_pronouns %>%
-  filter(fpp_n.state < 600)
+daily_text_pronouns$daily_zscore <- ave(daily_text_pronouns$daily.state, daily_text_pronouns$participant_id, FUN=scale)
+
+#daily_text_pronouns <- daily_text_pronouns %>%
+#  filter(fpp_n.state < 600)
 
 # lg.fit.q4 <- lme(fixed= daily.state ~ fpp_n.state*imean.fpp_n.c,
 #                  random= ~ 1 +diff_days |participant_id, 
@@ -418,26 +417,35 @@ daily_text_pronouns <- daily_text_pronouns %>%
 #                  control = ctrl,
 #                  na.action=na.exclude)
 
-daily_text_pronouns$fpp_n.state.s <- scale(daily_text_pronouns$fpp_n.state)
-
-daily_text_pronouns$imean.fpp_n.c.s <- scale(daily_text_pronouns$imean.fpp_n.c)
-
-model_3_0 <- lmer(daily ~ 1 + (1|participant_id), daily_text_pronouns,REML=FALSE)
+model_3_0 <- lmer(daily.state ~ 1 + (1|participant_id), daily_text_pronouns,REML=FALSE)
 
 summary(model_3_0)
 
+model_3_0 <- lmer(daily ~ fpp_zscore*imean.fpp_n + (diff_days|participant_id), daily_text_pronouns,REML=FALSE)
 
-model_3_1 <- lmer(daily.state ~ fpp_n.state.s*imean.fpp_n.c.s + (1|participant_id), daily_text_pronouns,REML=FALSE)
+library(optimx)
+model_3_1 <- lmer(daily.state ~ fpp_zscore*imean.fpp_n + (diff_days|participant_id), daily_text_pronouns,REML=FALSE)
 
 summary(model_3_1)
 
-plot(daily_text_pronouns$daily,daily_text_pronouns$fpp_n)
+sjstats::std_beta(model_3_1)
 
-interact_plot(model_3_1,imean.fpp_n.c.s,fpp_n.state.s,interval=TRUE,plot.points=FALSE)
+anova(model_3_0,model_3_1)
+
+ggplot(daily_text_pronouns, aes(x = imean.fpp_n, y = daily)) +
+  geom_point() +
+  stat_smooth(method = "lm", col = "red")
+
+test <- daily_text_pronouns %>% 
+  filter(imean.fpp_n < 250)
+
+#cor(test$imean.fpp_n,test$imean.daily)
+interact_plot(model_3_1,imean.fpp_n,fpp_zscore,interval=TRUE,plot.points=TRUE)
+
 
 ```
 
-```{r}
+```{r, include = FALSE}
 packages <- c("rio","tidyverse","reshape","lme4","interactions","jtools","janitor","merTools","plotly")
 if (length(setdiff(packages, rownames(installed.packages()))) > 0) {
   install.packages(setdiff(packages, rownames(installed.packages())))  
@@ -463,12 +471,58 @@ REplot <- function(out) {
   ggtitle('Plot of Random Effects', subtitle = 'Interval Estimates') 
 }
 
-FEplot(model_3_1)
-
-REplot(model_3_1)
 
 
-teplot_model(model_3_1, type = "re", facet.grid=FALSE)
+#teplot_model(model_3_1, type = "re", facet.grid=FALSE)
+
+```
+
+### Let's look at how average first person pronoun use is related to average daily mood (between subjects effect)
+
+```{r, echo = FALSE, warning=FALSE, message=FALSE}
+base_model <- lm(imean.daily~imean.fpp_n, daily_text_pronouns)
+sjstats::std_beta(base_model)
+
+cor(daily_text_pronouns$imean.fpp_n,daily_text_pronouns$imean.daily,use="complete.obs")
+
+ggplot(daily_text_pronouns, aes(x = imean.fpp_n, y = imean.daily)) +
+  geom_point() +
+  stat_smooth(method = "lm", col = "red")
+
+filtered_base_model <- lm(imean.daily~imean.fpp_n, test)
+sjstats::std_beta(filtered_base_model)
+cor(test$imean.fpp_n,test$imean.daily,use="complete.obs")
+
+ggplot(test, aes(x = imean.fpp_n, y = imean.daily)) +
+  geom_point() +
+  stat_smooth(method = "lm", col = "red")
+
+```
+
+###Now let's look at the within subjects effect 
+
+```{r, echo = FALSE}
+model_3_1 <- lmer(daily_zscore ~ fpp_zscore*social + (diff_days|participant_id), daily_text_pronouns,REML=FALSE)
+
+summary(model_3_1)
+
+sjstats::std_beta(model_3_1)
+
+cor(daily_text_pronouns$fpp_zscore,daily_text_pronouns$daily_zscore,use="complete.obs")
+
+ggplot(daily_text_pronouns, aes(x = fpp_zscore, y = daily_zscore)) +
+  geom_point() +
+  stat_smooth(method = "lm", col = "red")
+
+model_3_2 <- lmer(daily_zscore ~ fpp_zscore*imean.fpp_n + (diff_days|participant_id), test,REML=FALSE)
+
+sjstats::std_beta(model_3_2)
+
+cor(test$fpp_zscore,test$daily_zscore,use="complete.obs")
+
+ggplot(test, aes(x = fpp_zscore, y = daily_zscore,color=participant_id)) +
+  geom_point() +
+  stat_smooth(method = "lm", col = "red")
 
 ```
 
