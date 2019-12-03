@@ -122,17 +122,17 @@ for(i in 1:length(daily_testing_buckets)){
 }
 
 str(daily_ema_data$time_completed)
-library(anytime)
 
-as_datetime(as.numeric(daily_ema_data[["time_completed"]])/1000, origin="1970-01-01",tz="America/New_York")
+as_datetime(as.numeric(daily_ema_data[["time_completed"]])/1000, tz="America/New_York")
 
-as.POSIXct(daily_ema_data$time_completed, format="%Y-%m-%d %H:%M:%S",tz="America/New_York")
-
-daily_ema_data$timestamp_est <- as.POSIXct(daily_ema_data$time_completed, format="%Y-%m-%d %H:%M:%S",tz="America/New_York")
-
-daily_ema_data$timestamp_est <- as.POSIXct(daily_ema_data$timestamp_est, format="%Y-%m-%d %H:%M:%S",tz="America/New_York")
+daily_ema_data$timestamp_est <- as_datetime(as.numeric(daily_ema_data[["time_completed"]])/1000, tz="America/New_York")
 
 daily_ema_data$date <- as_date(daily_ema_data$timestamp_est)
+
+daily_ema_data$daily <- daily_ema_data$int_answer
+
+daily_ema_data <- daily_ema_data %>%
+  filter(date > "1969-12-31")
 
 daily_ema_data %>%
   ggplot(aes(x = timestamp_est, y = daily, group = participant_id)) +
@@ -208,7 +208,7 @@ daily_text_sentiment <- daily_text_sentiment %>%
    distinct(participant_id,date,socil,.keep_all = TRUE)
 
 hlm_data_sentiment <- merge(daily_text_sentiment, daily_ema_data, by=c("participant_id","date")) %>%
-  select(participant_id,date,daily_sentiment,n,site,daily,day_of_week,weekend,social,dating,timestamp_ema=timestamp_est)
+  select(participant_id,date,daily_sentiment,n,daily,social,dating,timestamp_ema=timestamp_est)
 
 
 
@@ -440,7 +440,6 @@ summary(model_3_0)
 
 model_3_0 <- lmer(daily ~ fpp_zscore*imean.fpp_n + (diff_days|participant_id), daily_text_pronouns,REML=FALSE)
 
-library(optimx)
 model_3_1 <- lmer(daily.state ~ fpp_zscore*imean.fpp_n + (diff_days|participant_id), daily_text_pronouns,REML=FALSE)
 
 summary(model_3_1)
@@ -454,7 +453,7 @@ ggplot(daily_text_pronouns, aes(x = imean.fpp_n, y = daily)) +
   stat_smooth(method = "lm", col = "red")
 
 test <- daily_text_pronouns %>% 
-  filter(imean.fpp_n < 250)
+  filter(imean.fpp_n < 150)
 
 #cor(test$imean.fpp_n,test$imean.daily)
 interact_plot(model_3_1,imean.fpp_n,fpp_zscore,interval=TRUE,plot.points=TRUE)
@@ -462,43 +461,13 @@ interact_plot(model_3_1,imean.fpp_n,fpp_zscore,interval=TRUE,plot.points=TRUE)
 
 ```
 
-```{r, include = FALSE}
-packages <- c("rio","tidyverse","reshape","lme4","interactions","jtools","janitor","merTools","plotly")
-if (length(setdiff(packages, rownames(installed.packages()))) > 0) {
-  install.packages(setdiff(packages, rownames(installed.packages())))  
-}
-lapply(packages, library, character.only = TRUE)
-
-# Simple function for plotting the fixed effects coefficients form an lmer() output
-FEplot <- function(out) {
-  feEx <- FEsim(out, 1000)
-  library(ggplot2)
-  ggplot(feEx[feEx$term!= "(Intercept)", ]) + 
-    aes(x = term, ymin = median - 1.96 * sd, 
-        ymax = median + 1.96 * sd, y = median) + 
-    geom_pointrange() + 
-    geom_hline(yintercept = 0, size = I(1.1), color = I("red")) + 
-    coord_flip() + 
-    theme_bw() + labs(title = "Coefficient Plot of Model", 
-                      x = "Median Effect Estimate", y = paste(out@call$formula[[2]]))
-}
-# Simple function for plotting the random effects coefficients form an lmer() output
-REplot <- function(out) {
-  plotREsim(REsim(out),facet=FALSE)  +
-  ggtitle('Plot of Random Effects', subtitle = 'Interval Estimates') 
-}
-
-
-
-#teplot_model(model_3_1, type = "re", facet.grid=FALSE)
-
-```
 
 ### Let's look at how average first person pronoun use is related to average daily mood (between subjects effect)
 
 ```{r, echo = FALSE, warning=FALSE, message=FALSE}
 base_model <- lm(imean.daily~imean.fpp_n, daily_text_pronouns)
-socialsjstats::std_beta(base_model)
+summary(base_model)
+sjstats::std_beta(base_model)
 
 cor(daily_text_pronouns$imean.fpp_n,daily_text_pronouns$imean.daily,use="complete.obs")
 
@@ -507,6 +476,7 @@ ggplot(daily_text_pronouns, aes(x = imean.fpp_n, y = imean.daily)) +
   stat_smooth(method = "lm", col = "red")
 
 filtered_base_model <- lm(imean.daily~imean.fpp_n, test)
+summary(filtered_base_model)
 sjstats::std_beta(filtered_base_model)
 cor(test$imean.fpp_n,test$imean.daily,use="complete.obs")
 
@@ -537,7 +507,7 @@ sjstats::std_beta(model_3_2)
 
 cor(test$fpp_zscore,test$daily_zscore,use="complete.obs")
 
-ggplot(test, aes(x = fpp_zscore, y = daily_zscore,color=participant_id)) +
+ggplot(test, aes(x = fpp_zscore, y = daily_zscore)) +
   geom_point() +
   stat_smooth(method = "lm", col = "red")
 
