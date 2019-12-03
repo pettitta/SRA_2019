@@ -25,7 +25,7 @@ lapply(packages, library, character.only = TRUE)
 intensive_ema_data <- import(here("data/ema_df.csv"))
 #daily_ema_data <- import(here("data/daily_df.csv"))
 raw_text_data <- read_excel(here("data/maps_text_unique_nopw.xlsx"))
-daily_ema_data <- read_excel(here("data/maps_daily_nopw.xlsx"))
+daily_ema_data <- import(here("data/maps_daily_20190910.csv"))
 
 #as.POSIXlt(raw_text_data$timestamp_est, format="%m/%d/%Y %H:%M",tz="America/New_York")
 
@@ -102,6 +102,8 @@ text_counts <- raw_text_data %>%
 ```{r, processing the daily EMA data, include = FALSE,message=FALSE,warning=FALSE,warning=FALSE}
 # Now let's see what the first EMA time and date is for each participant
 
+daily_ema_data$bucket_device_id <- daily_ema_data$device_id
+
 daily_ema_data <- daily_ema_data[!is.na(daily_ema_data$participant_id) & !is.na(daily_ema_data$bucket_device_id),]
 
 
@@ -118,6 +120,15 @@ for(i in 1:length(daily_testing_buckets)){
   daily_device_id[i,1] <- daily_testing_buckets[i]
   daily_device_id[i,2] <- what
 }
+
+str(daily_ema_data$time_completed)
+library(anytime)
+
+as_datetime(as.numeric(daily_ema_data[["time_completed"]])/1000, origin="1970-01-01",tz="America/New_York")
+
+as.POSIXct(daily_ema_data$time_completed, format="%Y-%m-%d %H:%M:%S",tz="America/New_York")
+
+daily_ema_data$timestamp_est <- as.POSIXct(daily_ema_data$time_completed, format="%Y-%m-%d %H:%M:%S",tz="America/New_York")
 
 daily_ema_data$timestamp_est <- as.POSIXct(daily_ema_data$timestamp_est, format="%Y-%m-%d %H:%M:%S",tz="America/New_York")
 
@@ -308,6 +319,8 @@ anova(test_0,test)
 
 interact_plot(test,imean.n.c,imean.daily_sentiment.c,plot.points=TRUE)
 
+hlm_data_sentiment <- hlm_data_sentiment %>%
+  dplyr::select(-social)
 ```
 
 
@@ -333,8 +346,7 @@ text_tidy_data_filtered$social <- as.factor(text_tidy_data_filtered$social)
 
 hlm_data_sentiment$start_time_ema <- hlm_data_sentiment$timestamp_ema - hours(24)
 
-hlm_data_sentiment <- hlm_data_sentiment %>%
-  dplyr::select(-social)
+
 
 setDT(text_tidy_data_filtered)
 setDT(hlm_data_sentiment)
@@ -392,11 +404,14 @@ daily_text_pronouns <- hlm_data_sentiment %>%
 
 
 ```{r, include = FALSE}
-daily.imeans <- plyr::ddply(daily_text_pronouns, .(participant_id,social), summarize,imean.fpp_n=mean(fpp_n, na.rm=TRUE))
+daily_text_pronouns <- daily_text_pronouns %>%
+  drop_na(social)
+
+daily.imeans <- plyr::ddply(daily_text_pronouns, c("participant_id","social"), summarize,imean.fpp_n=mean(fpp_n, na.rm=TRUE))
 
 daily.imeans$imean.fpp_n.c <- scale(daily.imeans$imean.fpp_n,center=TRUE,scale=FALSE)
 
-daily_text_pronouns <- merge(daily_text_pronouns,daily.imeans,by="participant_id")
+daily_text_pronouns <- merge(daily_text_pronouns,daily.imeans,by=c("participant_id","social"))
 
 daily_text_pronouns$fpp_n.state <- daily_text_pronouns$fpp_n - daily_text_pronouns$imean.fpp_n
 
@@ -404,6 +419,8 @@ daily_text_pronouns$fpp_n.state <- daily_text_pronouns$fpp_n - daily_text_pronou
 
 ```{r, include = FALSE}
 daily_text_pronouns$fpp_zscore <- ave(daily_text_pronouns$fpp_n.state, daily_text_pronouns$participant_id,daily_text_pronouns$social, FUN=scale)
+
+daily_text_pronouns$fpp_zscore[daily_text_pronouns$fpp_zscore=="NaN"] <- 0
 
 daily_text_pronouns$daily_zscore <- ave(daily_text_pronouns$daily.state, daily_text_pronouns$participant_id, FUN=scale)
 
@@ -481,7 +498,7 @@ REplot <- function(out) {
 
 ```{r, echo = FALSE, warning=FALSE, message=FALSE}
 base_model <- lm(imean.daily~imean.fpp_n, daily_text_pronouns)
-sjstats::std_beta(base_model)
+socialsjstats::std_beta(base_model)
 
 cor(daily_text_pronouns$imean.fpp_n,daily_text_pronouns$imean.daily,use="complete.obs")
 
