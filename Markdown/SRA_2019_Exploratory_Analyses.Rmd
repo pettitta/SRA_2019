@@ -15,6 +15,7 @@ if (length(setdiff(packages, rownames(installed.packages()))) > 0) {
 }
 lapply(packages, library, character.only = TRUE)
 
+options(digits=3)
 
 
 
@@ -123,9 +124,9 @@ for(i in 1:length(daily_testing_buckets)){
 
 str(daily_ema_data$time_completed)
 
-as_datetime(as.numeric(daily_ema_data[["time_completed"]])/1000, tz="America/New_York")
+as_datetime(as.numeric(daily_ema_data[["time_initiated"]])/1000, tz="America/New_York")
 
-daily_ema_data$timestamp_est <- as_datetime(as.numeric(daily_ema_data[["time_completed"]])/1000, tz="America/New_York")
+daily_ema_data$timestamp_est <- as_datetime(as.numeric(daily_ema_data[["time_initiated"]])/1000, tz="America/New_York")
 
 daily_ema_data$date <- as_date(daily_ema_data$timestamp_est)
 
@@ -359,6 +360,7 @@ setkey(text_tidy_data_filtered, participant_id, time1,time2)
 
 test <- foverlaps(hlm_data_sentiment,text_tidy_data_filtered, by.x = c("participant_id", "start_time_ema", "timestamp_ema"), nomatch = 0L)
 
+# test <- foverlaps(hlm_data_sentiment,text_tidy_data_filtered, by.x = c("participant_id", "timestamp_ema", "start_time_ema"), nomatch = 0L)
 
 
 what <- test %>%
@@ -453,7 +455,7 @@ ggplot(daily_text_pronouns, aes(x = imean.fpp_n, y = daily)) +
   stat_smooth(method = "lm", col = "red")
 
 test <- daily_text_pronouns %>% 
-  filter(imean.fpp_n < 150)
+  filter(imean.fpp_n < 120)
 
 #cor(test$imean.fpp_n,test$imean.daily)
 interact_plot(model_3_1,imean.fpp_n,fpp_zscore,interval=TRUE,plot.points=TRUE)
@@ -489,7 +491,7 @@ ggplot(test, aes(x = imean.fpp_n, y = imean.daily)) +
 ###Now let's look at the within subjects effect 
 
 ```{r, echo = FALSE}
-model_3_1 <- lmer(daily_zscore ~ fpp_zscore*social + (diff_days|participant_id), daily_text_pronouns,REML=FALSE)
+model_3_1 <- lmer(daily_zscore ~ fpp_zscore*imean.fpp_n + (diff_days|participant_id), daily_text_pronouns,REML=FALSE)
 
 summary(model_3_1)
 
@@ -502,7 +504,7 @@ ggplot(daily_text_pronouns, aes(x = fpp_zscore, y = daily_zscore)) +
   stat_smooth(method = "lm", col = "red")
 
 model_3_2 <- lmer(daily_zscore ~ fpp_zscore*imean.fpp_n + (diff_days|participant_id), test,REML=FALSE)
-
+summary(model_3_2)
 sjstats::std_beta(model_3_2)
 
 cor(test$fpp_zscore,test$daily_zscore,use="complete.obs")
@@ -510,6 +512,7 @@ cor(test$fpp_zscore,test$daily_zscore,use="complete.obs")
 ggplot(test, aes(x = fpp_zscore, y = daily_zscore)) +
   geom_point() +
   stat_smooth(method = "lm", col = "red")
+
 
 ```
 
