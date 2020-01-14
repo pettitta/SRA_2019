@@ -26,12 +26,12 @@ apatheme=theme_bw()+
 #raw_text_data <- import(here("data/text_df_unique.csv"))
 intensive_ema_data <- import(here("data/ema_df.csv"))
 #daily_ema_data <- import(here("data/daily_df.csv"))
-raw_text_data <- read_excel(here("data/maps_text_unique_nopw.xlsx"))
-daily_ema_data <- import(here("data/maps_daily_20190910.csv"))
+raw_text_data <- read_excel(here("data/maps_all_text_unique_20191217.xlsx"))
+daily_ema_data <- import(here("data/maps_daily_20191217.csv"))
 
 #as.POSIXlt(raw_text_data$timestamp_est, format="%m/%d/%Y %H:%M",tz="America/New_York")
 
-
+raw_text_data$bucket_device_id <- raw_text_data$device_id
 # Missing some participant IDs so I'm moving the bucket device ID over to the NA
 raw_text_data$participant_id[is.na(raw_text_data$participant_id)] <- raw_text_data$bucket_device_id[is.na(raw_text_data$participant_id)]
 
@@ -96,7 +96,6 @@ raw_text_data$date <- as.Date(raw_text_data$date, format = "%m/%d/%Y")
 text_counts <- raw_text_data %>%
   group_by(participant_id,date) %>%
   tally()
-
 
 ```
 
@@ -419,7 +418,7 @@ daily.imeans$imean.fpp_n.c <- scale(daily.imeans$imean.fpp_n,center=TRUE,scale=F
 daily_text_pronouns <- merge(daily_text_pronouns,daily.imeans,by=c("participant_id"))
 
 daily_text_pronouns$fpp_n.state <- daily_text_pronouns$fpp_n - daily_text_pronouns$imean.fpp_n
-
+rm (daily.imeans)
 ```
 
 ```{r, include = FALSE}
@@ -498,7 +497,7 @@ model_post_base <- lmer(n ~ 1 + (1|participant_id), daily_text_pronouns_post,REM
 
 summary(model_post_base)
 
-model_post <- lmer(n_zscore ~ daily_zscore + diff_days + (1|participant_id), daily_text_pronouns_post,REML=FALSE)
+model_post <- lmer(n_zscore ~ daily_zscore + (1|participant_id), daily_text_pronouns_post,REML=FALSE)
 
 summary(model_post)
 
@@ -600,29 +599,12 @@ library(ggiraph)
 library(ggiraphExtra)
 library(plyr)
 
-maybe <- ggeffects::ggpredict(model_sentiment,terms=c("daily_sentiment_zscore","imean.daily_sentiment"))
+#maybe <- ggeffects::ggpredict(model_sentiment,terms=c("daily_sentiment_zscore","imean.daily_sentiment"))
 
-ggplot(maybe,aes(x=x,y=predicted,color=group)) +
-  stat_smooth(method = "lm", se = TRUE, fullrange = TRUE) 
+#ggplot(maybe,aes(x=x,y=predicted,color=group)) +
+#  stat_smooth(method = "lm", se = TRUE, fullrange = TRUE) 
   
 
-mean_data <- hlm_sentiment %>%
-  select(participant_id,imean.daily,imean.daily_sentiment) %>%
-  distinct(participant_id,imean.daily_sentiment,imean.daily)
-
-mean_data <- mean_data %>%
-  filter(imean.daily_sentiment > -.5)
-
-base_model <- lm(imean.daily~imean.daily_sentiment, mean_data)
-summary(base_model)
-sjstats::std_beta(base_model)
-
-ggplot(hlm_sentiment, aes(x = daily_sentiment_zscore, y = daily_zscore)) +
-  geom_point() +
-  stat_smooth(method = "lm", col = "red") + 
-  xlab("Mean Daily FPP Use") +
-  ylab("Mean Daily Mood Score") +
-  apatheme
 ```
 
 ```{r}
@@ -661,7 +643,7 @@ FEplot <- function(out) {
 plot_model(hmm_2,type="std2")
 confint(hmm_2)
 
-visibly::plot_coefficients(hmm_2, ranef=TRUE,which_ranef='participant_id')
+#visibly::plot_coefficients(hmm_2, ranef=TRUE,which_ranef='participant_id')
 
 
 ```
@@ -758,6 +740,12 @@ ggplot(daily_text_pronouns, aes(x = fpp_zscore, y = daily_zscore)) +
   xlab("FPP Daily Deviations") + 
   ylab("Daily Mood Deviations") +
   apatheme
+ggplot(daily_text_pronouns, aes(x = fpp_zscore, y = daily_zscore)) +
+  geom_point() +
+  stat_smooth(method = "lm", aes(color = participant_id),se=FALSE) +
+  xlab("FPP Daily Deviations") + 
+  ylab("Daily Mood Deviations") +
+  apatheme
 
 ```
 
@@ -770,6 +758,20 @@ model_post <- lm(fpp_zscore ~ daily_zscore, daily_text_pronouns_post)
 
 tab_model(model_post,pred.labels = c("(Intercept)","Daily Mood Deviations"),dv.labels=("FPP Daily Deviations"),show.r2=FALSE)
 
+```
+
+
+# let's regress out N_zscore from fpp_zscore
+
+```{r}
+womp <- lm(fpp_zscore ~ n_zscore,daily_text_pronouns)
+daily_text_pronouns$fpp_residuals <- residuals(womp)
+
+womp_2 <- lmer(daily ~ fpp_residuals +(1|participant_id/diff_days), daily_text_pronouns,  control = lmerControl(optimizer ="Nelder_Mead"))
+
+summary(womp_2)
+
+tab_model(womp_2,show.std=TRUE)
 ```
 
 
